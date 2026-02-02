@@ -1,8 +1,8 @@
 local M = {}
 
 M.config = {
-  port = 1412,
   auto_open = true,
+  port = 1412,
 }
 
 local job_id = nil
@@ -17,6 +17,12 @@ function M.setup(opts)
   vim.api.nvim_create_user_command("MarkdownPreviewStop", function()
     M.stop()
   end, { desc = "Stop markdown preview server" })
+
+  vim.api.nvim_create_autocmd("VimLeavePre", {
+    callback = function()
+      M.stop()
+    end,
+  })
 end
 
 function M.open()
@@ -44,7 +50,7 @@ function M.open()
 
   job_id = vim.fn.jobstart(args, {
     on_exit = function(_, code)
-      if code ~= 0 then
+      if code ~= 0 and code ~= 143 then
         vim.notify("Markdown preview server exited with code " .. code, vim.log.levels.ERROR)
       end
       job_id = nil
@@ -57,15 +63,15 @@ function M.open()
   end
 end
 
+function M.is_open()
+  return job_id ~= nil
+end
+
 function M.stop()
   if job_id then
     vim.fn.jobstop(job_id)
     job_id = nil
   end
-end
-
-function M.is_open()
-  return job_id ~= nil
 end
 
 function M.toggle()
