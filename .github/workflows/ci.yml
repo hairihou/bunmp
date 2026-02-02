@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  pull_request:
+    paths-ignore: ["LICENSE", "README.md"]
+    types: [opened, ready_for_review, reopened, synchronize]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    steps:
+      - uses: actions/checkout@v6.0.1
+      - uses: oven-sh/setup-bun@v2.1.2
+      - run: bun install
+      - run: bun run lint
+      - run: bun run build

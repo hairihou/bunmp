@@ -1,0 +1,21 @@
+{
+  "name": "bunmp",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build --compile --minify index.ts --outfile bunmp",
+    "fmt": "oxfmt --write .",
+    "lint": "oxlint .",
+    "start": "bun index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.8",
+    "lefthook": "^2.0.16",
+    "oxfmt": "^0.28.0",
+    "oxlint": "^1.43.0"
+  },
+  "engines": {
+    "bun": ">=1.3.8"
+  }
+}

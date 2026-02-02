@@ -1,0 +1,6 @@
+{
+  "experimentalSortPackageJson": {
+    "sortScripts": true
+  },
+  "ignorePatterns": ["bun.lock"]
+}

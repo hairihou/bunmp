@@ -1,0 +1,28 @@
+name: Release
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: darwin-arm64
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: windows-latest
+            target: windows-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6.0.1
+      - uses: oven-sh/setup-bun@v2.1.2
+      - run: bun build --compile --minify index.ts --outfile bunmp-${{ matrix.target }}
+      - run: gh release upload ${{ github.event.release.tag_name }} bunmp-${{ matrix.target }}*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
