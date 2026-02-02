@@ -64,8 +64,11 @@ const scriptHtml = `<script>
 
 const renderHTML = async (): Promise<string> => {
   const md = await Bun.file(resolvedPath).text();
-  // @ts-expect-error headingIds is a valid option in Bun 1.3.8+
-  const content = Bun.markdown.html(md, { headingIds: true });
+  const content = Bun.markdown.html(md, {
+    headings: true,
+    latexMath: true,
+    wikiLinks: true,
+  });
 
   return `<!DOCTYPE html>
 <html lang="en">
