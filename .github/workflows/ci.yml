@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    paths-ignore: ["LICENSE", "README.md"]
+    paths-ignore: ['CLAUDE.md', 'LICENSE', 'README.md']
     types: [opened, ready_for_review, reopened, synchronize]
 
 concurrency:

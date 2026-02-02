@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
-import type { ServerWebSocket } from "bun";
-import { watch } from "fs";
-import { basename, resolve } from "path";
+import type { ServerWebSocket } from 'bun';
+import { watch } from 'fs';
+import { basename, resolve } from 'path';
 
 const escapeHtml = (str: string): string =>
-  str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const githubMarkdownCssUrl =
-  "https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown.min.css";
+  'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown.min.css';
 const layout = {
   maxWidth: 960,
   mobileBreakpoint: 768,
@@ -16,14 +16,14 @@ const layout = {
 const reconnectDelayMs = 1000;
 
 const args = process.argv.slice(2);
-const file = args.find((arg) => !arg.startsWith("-")) ?? "README.md";
-const portArg = args.find((arg) => arg.startsWith("--port="))?.split("=")[1];
+const file = args.find((arg) => !arg.startsWith('-')) ?? 'README.md';
+const portArg = args.find((arg) => arg.startsWith('--port='))?.split('=')[1];
 const port = portArg !== undefined ? parseInt(portArg, 10) : 1412;
 if (Number.isNaN(port)) {
-  console.error("Error: Invalid port number");
+  console.error('Error: Invalid port number');
   process.exit(1);
 }
-const noOpen = args.includes("--no-open");
+const noOpen = args.includes('--no-open');
 
 const clients = new Set<ServerWebSocket<undefined>>();
 
@@ -36,11 +36,11 @@ const resolvedPath = resolve(process.cwd(), file);
 
 const watcher = watch(resolvedPath, () => {
   for (const ws of clients) {
-    ws.send("reload");
+    ws.send('reload');
   }
 });
-watcher.on("error", (error) => {
-  console.error("Watch error:", error);
+watcher.on('error', (error) => {
+  console.error('Watch error:', error);
 });
 
 const styleHtml = `<style>
@@ -62,7 +62,7 @@ const scriptHtml = `<script>
   ws.onclose = () => setTimeout(() => location.reload(), ${reconnectDelayMs});
 </script>`;
 
-async function renderHTML(): Promise<string> {
+const renderHTML = async (): Promise<string> => {
   const md = await Bun.file(resolvedPath).text();
   // @ts-expect-error headingIds is a valid option in Bun 1.3.8+
   const content = Bun.markdown.html(md, { headingIds: true });
@@ -81,7 +81,7 @@ async function renderHTML(): Promise<string> {
   ${scriptHtml}
 </body>
 </html>`;
-}
+};
 
 const server = Bun.serve({
   port,
@@ -91,7 +91,7 @@ const server = Bun.serve({
     }
     const html = await renderHTML();
     return new Response(html, {
-      headers: { "Content-Type": "text/html; charset=utf-8" },
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
     });
   },
   websocket: {
@@ -109,11 +109,11 @@ console.log(`Previewing ${file} at http://localhost:${port}`);
 
 if (!noOpen) {
   const cmd =
-    process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+    process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
   Bun.spawn([cmd, `http://localhost:${port}`]);
 }
 
-process.on("SIGINT", () => {
+process.on('SIGINT', () => {
   watcher.close();
   server.stop();
   process.exit(0);
