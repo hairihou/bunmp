@@ -3,37 +3,50 @@ import type { ServerWebSocket } from 'bun';
 import { watch } from 'fs';
 import { basename, resolve } from 'path';
 
-const escapeHtml = (str: string): string =>
-  str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const githubMarkdownCssUrl =
-  'https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown.min.css';
-const layout = {
-  maxWidth: 960,
-  mobileBreakpoint: 768,
-  mobilePadding: 16,
-  padding: 48,
-} as const;
-const reconnectDelayMs = 1000;
-
 const args = process.argv.slice(2);
-const file = args.find((arg) => !arg.startsWith('-')) ?? 'README.md';
-const portArg = args.find((arg) => arg.startsWith('--port='))?.split('=')[1];
-const port = portArg !== undefined ? parseInt(portArg, 10) : 1412;
-if (Number.isNaN(port)) {
-  console.error('Error: Invalid port number');
-  process.exit(1);
+const mode = args.includes('--_server')
+  ? 'server'
+  : args.includes('--_webview')
+    ? 'webview'
+    : 'launcher';
+const isCompiled = !Bun.main.endsWith('.ts');
+const selfCmd = isCompiled ? process.execPath : Bun.main;
+const port = 1412;
+
+if (mode === 'webview') {
+  const { Webview } = await import('webview-bun');
+  const url = args.find((arg) => !arg.startsWith('-'));
+  const titleArg = args.find((arg) => arg.startsWith('--title='))?.split('=')[1];
+  if (url === undefined) {
+    process.exit(1);
+  }
+  const webview = new Webview();
+  webview.title = titleArg ?? 'bunmp';
+  webview.navigate(url);
+  webview.run();
+  process.exit(0);
 }
-const noOpen = args.includes('--no-open');
 
-const clients = new Set<ServerWebSocket<undefined>>();
-
+const file = args.find((arg) => !arg.startsWith('-')) ?? 'README.md';
 if (!(await Bun.file(file).exists())) {
   console.error(`Error: File not found: ${file}`);
   process.exit(1);
 }
-
 const resolvedPath = resolve(process.cwd(), file);
 
+if (mode === 'launcher') {
+  const serverArgs = isCompiled
+    ? [selfCmd, file, '--_server']
+    : ['bun', selfCmd, file, '--_server'];
+  Bun.spawn(serverArgs, {
+    cwd: process.cwd(),
+    stdout: 'ignore',
+    stderr: 'ignore',
+  });
+  process.exit(0);
+}
+
+const clients = new Set<ServerWebSocket<undefined>>();
 const watcher = watch(resolvedPath, () => {
   for (const ws of clients) {
     ws.send('reload');
@@ -43,24 +56,8 @@ watcher.on('error', (error) => {
   console.error('Watch error:', error);
 });
 
-const styleHtml = `<style>
-  body {
-    box-sizing: border-box;
-    max-width: ${layout.maxWidth}px;
-    margin: 0 auto;
-    padding: ${layout.padding}px;
-    background-color: var(--color-canvas-default);
-  }
-  @media (max-width: ${layout.mobileBreakpoint}px) {
-    body { padding: ${layout.mobilePadding}px; }
-  }
-</style>`;
-
-const scriptHtml = `<script>
-  const ws = new WebSocket(\`ws://\${location.host}\`);
-  ws.onmessage = () => location.reload();
-  ws.onclose = () => setTimeout(() => location.reload(), ${reconnectDelayMs});
-</script>`;
+const escapeHtml = (str: string): string =>
+  str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const renderHTML = async (): Promise<string> => {
   const md = await Bun.file(resolvedPath).text();
@@ -69,19 +66,25 @@ const renderHTML = async (): Promise<string> => {
     latexMath: true,
     wikiLinks: true,
   });
-
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(basename(file))}</title>
-  <link rel="stylesheet" href="${githubMarkdownCssUrl}">
-  ${styleHtml}
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown.min.css">
+  <style>
+    body { box-sizing: border-box; max-width: 960px; margin: 0 auto; padding: 48px; background-color: var(--color-canvas-default); }
+    @media (max-width: 768px) { body { padding: 16px; } }
+  </style>
 </head>
 <body class="markdown-body">
   ${content}
-  ${scriptHtml}
+  <script>
+    const ws = new WebSocket(\`ws://\${location.host}\`);
+    ws.onmessage = () => location.reload();
+    ws.onclose = () => setTimeout(() => location.reload(), 1000);
+  </script>
 </body>
 </html>`;
 };
@@ -92,8 +95,7 @@ const server = Bun.serve({
     if (server.upgrade(req)) {
       return;
     }
-    const html = await renderHTML();
-    return new Response(html, {
+    return new Response(await renderHTML(), {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     });
   },
@@ -108,16 +110,16 @@ const server = Bun.serve({
   },
 });
 
-console.log(`Previewing ${file} at http://localhost:${port}`);
-
-if (!noOpen) {
-  const cmd =
-    process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
-  Bun.spawn([cmd, `http://localhost:${port}`]);
-}
-
-process.on('SIGINT', () => {
+const shutdown = (): void => {
   watcher.close();
   server.stop();
   process.exit(0);
-});
+};
+
+const url = `http://localhost:${port}`;
+const webviewArgs = isCompiled
+  ? [selfCmd, url, `--title=${basename(file)}`, '--_webview']
+  : ['bun', selfCmd, url, `--title=${basename(file)}`, '--_webview'];
+Bun.spawn(webviewArgs).exited.then(shutdown);
+
+process.on('SIGINT', shutdown);
