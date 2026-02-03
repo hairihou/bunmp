@@ -1,70 +1,34 @@
 local M = {}
-
-M.config = {
-  auto_open = true,
-  port = 1412,
-}
-
 local job_id = nil
+local bin_path = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":h:h:h") .. "/index.ts"
 
-function M.setup(opts)
-  M.config = vim.tbl_deep_extend("force", M.config, opts or {})
-
-  vim.api.nvim_create_user_command("MarkdownPreview", function()
-    M.open()
-  end, { desc = "Open markdown preview in browser" })
-
-  vim.api.nvim_create_user_command("MarkdownPreviewStop", function()
-    M.stop()
-  end, { desc = "Stop markdown preview server" })
-
-  vim.api.nvim_create_autocmd("VimLeavePre", {
-    callback = function()
-      M.stop()
-    end,
-  })
+function M.setup()
+  vim.api.nvim_create_user_command("MarkdownPreview", M.open, { desc = "Open markdown preview" })
+  vim.api.nvim_create_user_command("MarkdownPreviewStop", M.stop, { desc = "Stop markdown preview" })
+  vim.api.nvim_create_autocmd("VimLeavePre", { callback = M.stop })
 end
 
 function M.open()
   local file = vim.fn.expand("%:p")
   if file == "" then
-    vim.notify("No file to preview", vim.log.levels.ERROR)
-    return
+    return vim.notify("No file to preview", vim.log.levels.ERROR)
   end
-
   if vim.bo.filetype ~= "markdown" then
-    vim.notify("Not a markdown file", vim.log.levels.WARN)
-    return
+    return vim.notify("Not a markdown file", vim.log.levels.WARN)
   end
-
   M.stop()
-
-  local script_path = debug.getinfo(1, "S").source:sub(2)
-  local plugin_dir = vim.fn.fnamemodify(script_path, ":h:h:h")
-  local bin_path = plugin_dir .. "/index.ts"
-
-  local args = { "bun", bin_path, file, "--port=" .. M.config.port }
-  if not M.config.auto_open then
-    table.insert(args, "--no-open")
-  end
-
-  job_id = vim.fn.jobstart(args, {
+  job_id = vim.fn.jobstart({ "bun", bin_path, file }, {
     on_exit = function(_, code)
       if code ~= 0 and code ~= 143 then
-        vim.notify("Markdown preview server exited with code " .. code, vim.log.levels.ERROR)
+        vim.notify("Markdown preview exited with code " .. code, vim.log.levels.ERROR)
       end
       job_id = nil
     end,
   })
-
   if job_id <= 0 then
-    vim.notify("Failed to start markdown preview server", vim.log.levels.ERROR)
+    vim.notify("Failed to start markdown preview", vim.log.levels.ERROR)
     job_id = nil
   end
-end
-
-function M.is_open()
-  return job_id ~= nil
 end
 
 function M.stop()
@@ -75,7 +39,7 @@ function M.stop()
 end
 
 function M.toggle()
-  if M.is_open() then
+  if job_id then
     M.stop()
   else
     M.open()
