@@ -11,7 +11,8 @@ Fast markdown preview powered by [Bun](https://bun.sh)'s built-in markdown parse
 ## Usage
 
 ```sh
-bunx github:hairihou/bunmp README.md
+bun add -g github:hairihou/bunmp
+bunmp README.md
 ```
 
 ### Neovim (lazy.nvim)
