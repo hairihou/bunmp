@@ -5,8 +5,6 @@ node_modules
 out
 dist
 *.tgz
-/bunmp
-bunmp-*
 
 # code coverage
 coverage
