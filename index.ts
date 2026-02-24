@@ -3,69 +3,51 @@ import type { ServerWebSocket } from 'bun';
 import { watch } from 'fs';
 import { basename, resolve } from 'path';
 
-const args = process.argv.slice(2);
-const mode = args.includes('--_server')
-  ? 'server'
-  : args.includes('--_webview')
-    ? 'webview'
-    : 'launcher';
-const isCompiled = !Bun.main.endsWith('.ts');
-const selfCmd = isCompiled ? process.execPath : Bun.main;
-const port = 1412;
-
-if (mode === 'webview') {
-  const { Webview } = await import('webview-bun');
-  const url = args.find((arg) => !arg.startsWith('-'));
-  const titleArg = args.find((arg) => arg.startsWith('--title='))?.split('=')[1];
-  if (url === undefined) {
-    process.exit(1);
-  }
-  const webview = new Webview();
-  webview.title = titleArg ?? 'bunmp';
-  webview.navigate(url);
-  webview.run();
-  process.exit(0);
-}
-
-const file = args.find((arg) => !arg.startsWith('-')) ?? 'README.md';
+const file = process.argv.slice(2).find((arg) => !arg.startsWith('-')) ?? 'README.md';
 if (!(await Bun.file(file).exists())) {
   console.error(`Error: File not found: ${file}`);
   process.exit(1);
 }
 const resolvedPath = resolve(process.cwd(), file);
 
-if (mode === 'launcher') {
-  const serverArgs = isCompiled
-    ? [selfCmd, file, '--_server']
-    : ['bun', selfCmd, file, '--_server'];
-  Bun.spawn(serverArgs, {
-    cwd: process.cwd(),
-    stdout: 'ignore',
-    stderr: 'ignore',
+const htmlEscapes: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+};
+const escapeHtml = (str: string): string => str.replace(/[&<>"]/g, (ch) => htmlEscapes[ch]);
+
+const renderContent = async (): Promise<string> => {
+  const md = await Bun.file(resolvedPath).text();
+  return Bun.markdown.html(md, {
+    headings: true,
+    latexMath: true,
+    wikiLinks: true,
   });
-  process.exit(0);
-}
+};
 
 const clients = new Set<ServerWebSocket<undefined>>();
+let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 const watcher = watch(resolvedPath, () => {
-  for (const ws of clients) {
-    ws.send('reload');
-  }
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(async () => {
+    try {
+      const content = await renderContent();
+      for (const ws of clients) {
+        ws.send(content);
+      }
+    } catch (error) {
+      console.error('Render error:', error);
+    }
+  }, 50);
 });
 watcher.on('error', (error) => {
   console.error('Watch error:', error);
 });
 
-const escapeHtml = (str: string): string =>
-  str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
 const renderHTML = async (): Promise<string> => {
-  const md = await Bun.file(resolvedPath).text();
-  const content = Bun.markdown.html(md, {
-    headings: true,
-    latexMath: true,
-    wikiLinks: true,
-  });
+  const content = await renderContent();
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -79,16 +61,17 @@ const renderHTML = async (): Promise<string> => {
   </style>
 </head>
 <body class="markdown-body">
-  ${content}
+  <div id="content">${content}</div>
   <script>
     const ws = new WebSocket(\`ws://\${location.host}\`);
-    ws.onmessage = () => location.reload();
+    ws.onmessage = (e) => { document.getElementById('content').innerHTML = e.data; };
     ws.onclose = () => setTimeout(() => location.reload(), 1000);
   </script>
 </body>
 </html>`;
 };
 
+const port = 1412;
 const server = Bun.serve({
   port,
   async fetch(req, server) {
@@ -110,16 +93,14 @@ const server = Bun.serve({
   },
 });
 
+const openCmd =
+  process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+Bun.spawn([openCmd, `http://localhost:${port}`]);
+
 const shutdown = (): void => {
   watcher.close();
   server.stop();
   process.exit(0);
 };
-
-const url = `http://localhost:${port}`;
-const webviewArgs = isCompiled
-  ? [selfCmd, url, `--title=${basename(file)}`, '--_webview']
-  : ['bun', selfCmd, url, `--title=${basename(file)}`, '--_webview'];
-Bun.spawn(webviewArgs).exited.then(shutdown);
-
 process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

@@ -11,16 +11,9 @@
     "lint": "oxlint .",
     "start": "bun index.ts"
   },
-  "dependencies": {
-    "webview-bun": "^2.4.0"
-  },
   "devDependencies": {
-    "@types/bun": "^1.3.9",
     "lefthook": "^2.1.1",
-    "oxfmt": "^0.32.0",
-    "oxlint": "^1.47.0"
-  },
-  "engines": {
-    "bun": ">=1.3.8"
+    "oxfmt": "^0.35.0",
+    "oxlint": "^1.50.0"
   }
 }

@@ -1,7 +1,7 @@
 {
-  "experimentalSortPackageJson": {
-    "sortScripts": true
-  },
   "ignorePatterns": ["bun.lock"],
-  "singleQuote": true
+  "singleQuote": true,
+  "sortPackageJson": {
+    "sortScripts": true
+  }
 }

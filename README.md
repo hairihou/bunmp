@@ -1,10 +1,8 @@
 # bunmp
 
-> [!NOTE]
-> Supports darwin-arm64 only
-
 Fast markdown preview powered by [Bun](https://bun.sh)'s built-in markdown parser.
 
+- Opens in default browser
 - GitHub-flavored Markdown support
 - Live reload on file changes
 
