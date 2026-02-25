@@ -1,5 +1,5 @@
 {
-  "ignorePatterns": ["bun.lock"],
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "singleQuote": true,
   "sortPackageJson": {
     "sortScripts": true
